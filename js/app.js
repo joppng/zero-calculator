@@ -793,6 +793,9 @@ function initInstallBanner(){
 --------------------------------------------------------------------- */
 try {
   const CHANGELOG = [
+    { version:'v1.76', date:'26-09-2026', items:[
+      'Dope Card: maximaal aantal doelen op de target card van 3 naar 6 gebracht. De tab staat in de desktop-tabbalk nu tussen Turret Tape en Dry Fire, in plaats van helemaal achteraan.',
+    ]},
     { version:'v1.75', date:'26-09-2026', items:[
       'Dope Card: de WIND/SPIN-schakelaar in het windvak staat nu rechts in het vak (naast de wind-informatie, i.p.v. erboven) met grotere tikvlakken — was op een echt toestel lastig te raken.',
     ]},

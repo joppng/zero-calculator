@@ -1,7 +1,7 @@
 /* ---------------------------------------------------------------------
    Applied Concepts — Dope Card
    Digitale pols-dope kaart: fullscreen overlay met een dope-grid, een
-   windklok en een target card (max 3 doelen). Herbruikt het bestaande
+   windklok en een target card (max 6 doelen). Herbruikt het bestaande
    wapenprofiel (js/profiles.js) voor BC/V0/dragModel/zero — geen aparte
    profielenlijst — en de SIGHTS/MOUNTS-HOB-data uit js/app.js voor de
    richtmiddelhoogte-picker. Ballistiek via js/ballistics.js
@@ -12,6 +12,7 @@
 const DC_SETTINGS_KEY = 'ac_dopecard_settings_v1';
 const DC_WIND_KEY = 'ac_dopecard_wind_v1';
 const DC_TARGETS_KEY = 'ac_dopecard_targets_v1';
+const DC_MAX_TARGETS = 6;
 
 // Moet in de pas blijven met .dc-wind-cell's flex-gewicht in css/styles.css —
 // het windvak toont 4 regels tekst en heeft dus meer ruimte nodig dan één
@@ -252,7 +253,7 @@ function dcToggleTarget(d){
   const idx = dcTargets.indexOf(d);
   if(idx >= 0){ dcTargets.splice(idx,1); }
   else {
-    if(dcTargets.length >= 3){ dcShowToast('Max 3 doelen'); return; }
+    if(dcTargets.length >= DC_MAX_TARGETS){ dcShowToast(`Max ${DC_MAX_TARGETS} doelen`); return; }
     dcTargets.push(d);
   }
   dcSave(DC_TARGETS_KEY, dcTargets);
@@ -592,7 +593,7 @@ function dcRenderSetup(root){
   if(profiles.length === 0){
     root.innerHTML = `
       <div class="simplepanel-head"><div><h2>Dope Card</h2>
-        <p class="sub">Digitale dope-kaart voor op de pols — windklok, live windholds en een target card voor tot 3 doelen.</p>
+        <p class="sub">Digitale dope-kaart voor op de pols — windklok, live windholds en een target card voor tot 6 doelen.</p>
       </div></div>
       <div class="dc-noprofile">
         <p class="hint">Je hebt nog geen wapenprofiel. Maak er eerst één aan bij "Wapenprofielen" (kaliber, drag model, BC, V0, zero-afstand) — de Dope Card gebruikt datzelfde profiel.</p>
@@ -612,7 +613,7 @@ function dcRenderSetup(root){
 
   root.innerHTML = `
     <div class="simplepanel-head"><div><h2>Dope Card</h2>
-      <p class="sub">Digitale dope-kaart voor op de pols — windklok, live windholds en een target card voor tot 3 doelen.</p>
+      <p class="sub">Digitale dope-kaart voor op de pols — windklok, live windholds en een target card voor tot 6 doelen.</p>
     </div></div>
 
     <fieldset class="dryfire-mode-fieldset">

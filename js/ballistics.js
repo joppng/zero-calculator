@@ -331,7 +331,7 @@ function computeAtmosphere({ tempC, altitudeM, pressureHpa }){
  * changes; the UI then just multiplies driftMilPerMps by the current
  * effective wind, which is why wind itself feels instant.
  */
-function computeDopeCardTable(profile, atmosphere, distancesM){
+function computeDopeCardTable(profile, atmosphere, distancesM, spinParams){
   const dragTable = dragTableFor(profile.dragModel);
   const customFactor = (profile.customDragFactor && profile.customDragFactor > 0) ? profile.customDragFactor : 1;
   const effectiveBC = profile.bc * customFactor;
@@ -353,6 +353,8 @@ function computeDopeCardTable(profile, atmosphere, distancesM){
     targetDistancesFt, calcStepFt, densityFactor, machFps,
   });
 
+  const sg = spinParams ? millerStability(spinParams) : null;
+
   const table = new Map();
   results.forEach(r => {
     const distanceM = Math.round(r.distanceFt / BALLISTICS_FT_PER_M);
@@ -363,10 +365,38 @@ function computeDopeCardTable(profile, atmosphere, distancesM){
     const noDragTime = r.x / muzzleVelocityFps;
     const driftFtPerMps = (r.time - noDragTime) * BALLISTICS_FT_PER_M; // 1 m/s wind → ft of drift
     const driftMilPerMps = (driftFtPerMps / r.x) * 1000;
-    table.set(distanceM, { elevMil, driftMilPerMps });
+    const entry = { elevMil, driftMilPerMps };
+    if(sg != null){
+      const driftM = spinDriftIn(sg, r.time) * 0.0254;
+      entry.spinDriftMil = Math.atan(driftM / distanceM) * 1000;
+    }
+    table.set(distanceM, entry);
   });
   sortedM.forEach(d => { if(!table.has(d)) table.set(d, null); });
   return table;
+}
+
+/**
+ * Miller twist-rate stability formula (imperial units) — the standard,
+ * widely-used approximation (Litz/Applied Ballistics/JBM all use this or
+ * an equivalent). SG > ~1.4 is comfortably stable; below ~1.0 is unstable.
+ */
+function millerStability({ bulletWeightGr, bulletDiameterIn, bulletLengthIn, twistIn, muzzleVelocityFps }){
+  const t = twistIn / bulletDiameterIn; // twist in calibers per turn
+  const L = bulletLengthIn / bulletDiameterIn; // bullet length in calibers
+  let sg = (30 * bulletWeightGr) / (t * t * Math.pow(bulletDiameterIn, 3) * L * (1 + L * L));
+  sg *= Math.pow(muzzleVelocityFps / 2800, 1 / 3);
+  return sg;
+}
+
+/**
+ * Litz spin drift approximation (inches): 1.25 * (SG + 1.2) * TOF(s)^1.83.
+ * Direction: assumes a right-hand (clockwise) twist — the standard for
+ * almost all modern rifles — which drifts the same direction it spins:
+ * right. Out of scope: a left-hand-twist option (would just flip the sign).
+ */
+function spinDriftIn(sg, tofSec){
+  return 1.25 * (sg + 1.2) * Math.pow(tofSec, 1.83);
 }
 
 /**
@@ -414,5 +444,6 @@ function runSelfTest(){
 
 window.AppliedConceptsBallistics = {
   computeHoldTableMil, computeTrajectoryProfile, computeAtmosphere, computeDopeCardTable,
+  millerStability, spinDriftIn,
   runSelfTest, G1_DRAG_TABLE, G7_DRAG_TABLE,
 };

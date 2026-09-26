@@ -793,6 +793,9 @@ function initInstallBanner(){
 --------------------------------------------------------------------- */
 try {
   const CHANGELOG = [
+    { version:'v1.74', date:'26-09-2026', items:[
+      'Dope Card: de kolommen (afstand/elevatie/wind) staan nu netjes onder elkaar uitgelijnd (vaste kolombreedtes i.p.v. meeschuivend met badge/gewone tekst). Het windvak heeft nu een WIND/SPIN-schakelaar: op SPIN tonen alle regels spindrift per afstand in plaats van windhold, berekend via de Miller-stabiliteitsformule en Litz\' spindrift-benadering (rechtsdraaiende twist aangenomen, zoals vrijwel elk modern geweer) — vereist twist rate, kogeldiameter, -lengte en -gewicht bij het wapenprofiel. De windstap bij het swipen op het windvak is nu instelbaar (0.5 / 1.0 / 2.0 m/s per stap) in plaats van vast op 0.5. Wapenprofielen heeft er een kogeldiameter-veld bij (automatisch ingevuld op basis van het kaliber).',
+    ]},
     { version:'v1.73', date:'26-09-2026', items:[
       'Dope Card — verbeteringen na eerste test: het windvak overlapte soms met de regel eronder, opgelost met meer ruimte in het raster. Op het kruisje (✕) tikken sluit de Dope Card nu écht af — een volgende tik op de tab komt weer bij de instellingen uit, in plaats van meteen door te schieten naar fullscreen (via ⚙ of "Opslaan" start hij weer automatisch op). Het aparte richtmiddelhoogte-veld is verwijderd — de Dope Card gebruikt nu gewoon de hoogte uit het wapenprofiel zelf. Hoogte kan nu ook via de locatievoorziening van je toestel ingevuld worden (temperatuur/luchtdruk blijven handmatig, dat kan een telefoon niet meten). Kaliber bij Wapenprofielen is nu een echte dropdown (met "Anders/handmatig" voor vrije invoer) in plaats van een <datalist>, die op iOS Safari onbetrouwbaar was — en er is een .338 Lapua Mag-fabrieksladingpreset (Lapua Scenar-L 250gr Lock Base) bijgekomen.',
     ]},

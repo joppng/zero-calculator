@@ -118,6 +118,25 @@ function acProfileToBallisticsInput(profile){
   return input;
 }
 
+// Parseert "1:10" / "1:9.5" -> 10 / 9.5 (twist in inch per omwenteling).
+function acParseTwistIn(str){
+  const m = String(str||'').match(/1\s*:\s*([\d.]+)/);
+  return m ? parseFloat(m[1]) : null;
+}
+// Alles wat de Miller-stabiliteitsformule (-> spin drift, Dope Card) nodig
+// heeft. Los van toBallisticsInput omdat het optioneel is (spin drift is een
+// uitbreiding, geen vereiste voor de gewone hold-tabel) — null als er
+// velden ontbreken, zodat de aanroeper spin drift dan gewoon niet aanbiedt.
+function acProfileSpinDriftParams(profile){
+  const bulletWeightGr = parseFloat(profile.bulletWeightGr);
+  const bulletDiameterIn = parseFloat(profile.bulletDiameterIn);
+  const bulletLengthIn = parseFloat(profile.bulletLengthIn);
+  const twistIn = acParseTwistIn(profile.twistRateIn);
+  const muzzleVelocityFps = acMuzzleVelocityFps(profile);
+  if(!(bulletWeightGr > 0) || !(bulletDiameterIn > 0) || !(bulletLengthIn > 0) || !(twistIn > 0) || !(muzzleVelocityFps > 0)) return null;
+  return { bulletWeightGr, bulletDiameterIn, bulletLengthIn, twistIn, muzzleVelocityFps };
+}
+
 function acProfileHoldTable(profile){
   const input = acProfileToBallisticsInput(profile);
   if(!input) return null;
@@ -180,7 +199,7 @@ let acProfilesUI = { mode: 'list', editingId: null, draft: null };
 
 function acBlankProfile(){
   return {
-    id: null, label: '', caliber: '', bulletWeightGr: '', bulletLengthIn: '',
+    id: null, label: '', caliber: '', bulletWeightGr: '', bulletLengthIn: '', bulletDiameterIn: '',
     dragModel: 'G7', bc: '', customDragFactor: '', muzzleVelocity: '', muzzleVelocityUnit: 'ms',
     zeroDistanceM: 100, sightHeight: 5, sightHeightUnit: 'cm', twistRateIn: '', dope: {},
     roundLog: [],
@@ -250,7 +269,18 @@ function acRenderProfileList(root){
   }));
 }
 
-const AC_CALIBERS = ['.308 Win','.300 Win Mag','.300 PRC','.338 Lapua Mag','.338 Norma Mag','6.5 Creedmoor','6.5 PRC','7.62x51mm NATO','.50 BMG'];
+const AC_CALIBERS = ['5.56x45mm','.308 Win','7.62x51mm NATO','.300 Win Mag','.300 PRC','.338 Lapua Mag','.338 Norma Mag','6.5 Creedmoor','6.5 PRC','.50 BMG'];
+// Kogeldiameter per kaliber (inch) — voor de Miller-stabiliteitsformule
+// (spin drift). Losstaand van de kaliber-tekst zelf, want die is niet
+// betrouwbaar te parsen (".308 Win" toevallig wel de diameter, "7.62x51mm
+// NATO" niet) — vandaar een expliciete tabel + een eigen, overschrijfbaar
+// veld in plaats van er iets uit te raden.
+const AC_CALIBER_DIAMETER_IN = {
+  '5.56x45mm': 0.224, '.308 Win': 0.308, '7.62x51mm NATO': 0.308,
+  '.300 Win Mag': 0.308, '.300 PRC': 0.308,
+  '.338 Lapua Mag': 0.338, '.338 Norma Mag': 0.338,
+  '6.5 Creedmoor': 0.264, '6.5 PRC': 0.264, '.50 BMG': 0.510,
+};
 
 // Indicatieve fabrieksladingen — vult dragModel/BC/V0 in ter referentie; de
 // gebruiker wordt er expliciet op gewezen dat dit een startpunt is, geen
@@ -292,7 +322,7 @@ function acRenderProfileEditor(root){
 
           <label for="pfTwist">Twist rate</label>
           <input type="text" id="pfTwist" placeholder="bv. 1:10" value="${acEscapeHtml(p.twistRateIn)}">
-          <p class="hint">Wordt nu alleen bewaard bij het profiel (nog niet gebruikt in de berekening — reserveren we voor een toekomstige spin drift-uitbreiding).</p>
+          <p class="hint">Rechtsdraaiend aangenomen (verreweg de meeste moderne geweren) — samen met kogeldiameter, -lengte en -gewicht gebruikt voor de spin drift-berekening in Dope Card.</p>
         </fieldset>
 
         <fieldset>
@@ -306,6 +336,10 @@ function acRenderProfileEditor(root){
 
           <label for="pfBulletWeight">Bullet weight (gr)</label>
           <input type="number" id="pfBulletWeight" step="0.1" min="0" value="${acEscapeHtml(p.bulletWeightGr)}">
+
+          <label for="pfBulletDiameter">Kogeldiameter (inch)</label>
+          <input type="number" id="pfBulletDiameter" step="0.001" min="0" value="${acEscapeHtml(p.bulletDiameterIn)}">
+          <p class="hint">Automatisch ingevuld op basis van het kaliber hierboven — overschrijf indien nodig.</p>
 
           <label for="pfBulletLength">Bullet length (inch)</label>
           <input type="number" id="pfBulletLength" step="0.001" min="0" value="${acEscapeHtml(p.bulletLengthIn)}">
@@ -374,7 +408,7 @@ function acRenderProfileEditor(root){
   const form = root.querySelector('#profileForm');
   const fieldIds = {
     label:'pfLabel', caliber:'pfCaliber', twistRateIn:'pfTwist',
-    bulletWeightGr:'pfBulletWeight', bulletLengthIn:'pfBulletLength', dragModel:'pfDragModel',
+    bulletWeightGr:'pfBulletWeight', bulletLengthIn:'pfBulletLength', bulletDiameterIn:'pfBulletDiameter', dragModel:'pfDragModel',
     bc:'pfBc', customDragFactor:'pfDragFactor', muzzleVelocity:'pfMv', muzzleVelocityUnit:'pfMvUnit',
     sightHeight:'pfSightHeight', sightHeightUnit:'pfSightHeightUnit', zeroDistanceM:'pfZero',
   };
@@ -426,6 +460,7 @@ function acRenderProfileEditor(root){
     } else {
       customInput.hidden = true;
       customInput.value = e.target.value;
+      if(AC_CALIBER_DIAMETER_IN[e.target.value] != null) form.querySelector('#pfBulletDiameter').value = AC_CALIBER_DIAMETER_IN[e.target.value];
     }
     syncDraftFromForm();
     renderDopeTable();
@@ -566,4 +601,5 @@ window.AppliedConceptsProfiles = {
   fmtMil: acFmtMil,
   escapeHtml: acEscapeHtml,
   toBallisticsInput: acProfileToBallisticsInput,
+  spinDriftParams: acProfileSpinDriftParams,
 };

@@ -17,13 +17,15 @@ const DC_TARGETS_KEY = 'ac_dopecard_targets_v1';
 // het windvak toont 4 regels tekst en heeft dus meer ruimte nodig dan één
 // normale afstandsregel (gewicht 1); anders lopen label/sub-tekst over in
 // het blok eronder (precies het "streep door EFF WIND"-probleem).
-const DC_WIND_CELL_WEIGHT = 3;
+const DC_WIND_CELL_WEIGHT = 3.5;
 
 const DC_DEFAULT_SETTINGS = {
   activeProfileId: null,
   envMode: 'altitude', envTempC: 15, envAltitudeM: 0, envPressureHpa: 1013.25,
   rangeStart: 200, rangeEnd: 980, rangeInterval: 20,
   wristMode: 'device', theme: 'day',
+  windStep: 0.5,
+  windCellMode: 'wind', // 'wind' | 'spindrift' — welke waarde de kolommen tonen
 };
 // 5.0 m/s @ 3:00 doubles as the spec's own worked example (R5.0) — a sane,
 // checkable default rather than an arbitrary one.
@@ -70,7 +72,8 @@ function dcRecomputeTable(){
   if(dcSettings.envMode === 'pressure') atmInput.pressureHpa = dcSettings.envPressureHpa;
   else atmInput.altitudeM = dcSettings.envAltitudeM;
   const atmosphere = window.AppliedConceptsBallistics.computeAtmosphere(atmInput);
-  dcTable = window.AppliedConceptsBallistics.computeDopeCardTable(input, atmosphere, dcDistances());
+  const spinParams = window.AppliedConceptsProfiles.spinDriftParams(profile); // null als het profiel geen (volledige) twist/afmetingen heeft — spindrift dan simpelweg niet beschikbaar
+  dcTable = window.AppliedConceptsBallistics.computeDopeCardTable(input, atmosphere, dcDistances(), spinParams);
   return true;
 }
 
@@ -168,6 +171,16 @@ function dcFmtWindHold(driftMilPerMps){
   const val = driftMilPerMps * eff;
   const s = val.toFixed(1);
   return (dir == null || s === '0.0') ? '0.0' : dir + s;
+}
+// Rechterwaarde per rij — wind- of spindrift-hold, afhankelijk van de
+// schakelaar in het windvak. Spindrift heeft geen "effectieve" component
+// (het hangt niet van de wind af) en wordt aangenomen rechtsdraaiend, zoals
+// vrijwel elk modern geweer — vandaar altijd de R-richting.
+function dcFmtRowRight(row){
+  if(dcSettings.windCellMode === 'spindrift'){
+    return (row && row.spinDriftMil != null) ? 'R' + row.spinDriftMil.toFixed(1) : '—';
+  }
+  return (row && row.driftMilPerMps != null) ? dcFmtWindHold(row.driftMilPerMps) : '—';
 }
 
 /* ---- Rotatie: fysieke aanraakcoördinaten -> logische (voor-rotatie) delta.
@@ -385,6 +398,10 @@ function dcDopeScreenHtml(){
   const colsHtml = cols.map((colBlocks, ci) => {
     const windCellHtml = ci === 0 ? `
       <div class="dc-wind-cell" data-role="windcell" style="flex:${DC_WIND_CELL_WEIGHT} 1 0;">
+        <div class="dc-wind-mode-toggle" data-role="windmodetoggle">
+          <button type="button" class="dc-wind-mode-btn${dcSettings.windCellMode!=='spindrift'?' active':''}" data-mode="wind">WIND</button>
+          <button type="button" class="dc-wind-mode-btn${dcSettings.windCellMode==='spindrift'?' active':''}" data-mode="spindrift">SPIN</button>
+        </div>
         <span class="dc-wind-badge">${dir || '—'}</span>
         <span class="dc-wind-value">${dcEffWind().eff.toFixed(1)}</span>
         <span class="dc-wind-label">EFF WIND m/s</span>
@@ -394,7 +411,7 @@ function dcDopeScreenHtml(){
       const rowsHtml = block.distances.map((d,i) => {
         const row = dcTable ? dcTable.get(d) : null;
         const elevStr = row && row.elevMil != null ? dcFmtElev(row.elevMil) : '—';
-        const windStr = row && row.driftMilPerMps != null ? dcFmtWindHold(row.driftMilPerMps) : '—';
+        const windStr = dcFmtRowRight(row);
         const selIdx = dcTargets.indexOf(d);
         const selected = selIdx >= 0;
         const isBadgeRow = i === 0 || selected;
@@ -417,8 +434,23 @@ function dcWireDopeScreen(){
   const windCell = dcOverlayEl.querySelector('[data-role="windcell"]');
   if(windCell) dcAttachSwipeOrTap(windCell, {
     onTap: () => dcGoScreen('wind'),
-    onSwipe: (logical) => dcAdjustWindSpeed(logical.dy < 0 ? 0.5 : -0.5),
+    onSwipe: (logical) => dcAdjustWindSpeed(logical.dy < 0 ? dcSettings.windStep : -dcSettings.windStep),
   });
+  const modeToggle = dcOverlayEl.querySelector('[data-role="windmodetoggle"]');
+  if(modeToggle){
+    // Los van de swipe/tap-gesture op de rest van het windvak — anders zou
+    // een tik op deze knoppen ook meteen naar het windscherm navigeren.
+    modeToggle.addEventListener('pointerdown', (e) => e.stopPropagation());
+    modeToggle.addEventListener('pointerup', (e) => e.stopPropagation());
+    modeToggle.querySelectorAll('.dc-wind-mode-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        dcSettings.windCellMode = btn.dataset.mode;
+        dcSave(DC_SETTINGS_KEY, dcSettings);
+        dcRenderFullscreen();
+      });
+    });
+  }
   dcOverlayEl.querySelectorAll('.dc-row').forEach(row => {
     row.addEventListener('click', () => dcToggleTarget(parseInt(row.dataset.dist,10)));
   });
@@ -479,10 +511,10 @@ function dcWireWindScreen(){
   if(back) back.addEventListener('click', () => dcGoScreen('dope'));
   const minus = dcOverlayEl.querySelector('[data-act="minus"]');
   const plus = dcOverlayEl.querySelector('[data-act="plus"]');
-  if(minus) minus.addEventListener('click', () => dcAdjustWindSpeed(-0.5));
-  if(plus) plus.addEventListener('click', () => dcAdjustWindSpeed(0.5));
+  if(minus) minus.addEventListener('click', () => dcAdjustWindSpeed(-dcSettings.windStep));
+  if(plus) plus.addEventListener('click', () => dcAdjustWindSpeed(dcSettings.windStep));
   const speedVal = dcOverlayEl.querySelector('[data-role="speedval"]');
-  if(speedVal) dcAttachSwipeOrTap(speedVal, { onSwipe: (logical) => dcAdjustWindSpeed(logical.dy < 0 ? 0.5 : -0.5) });
+  if(speedVal) dcAttachSwipeOrTap(speedVal, { onSwipe: (logical) => dcAdjustWindSpeed(logical.dy < 0 ? dcSettings.windStep : -dcSettings.windStep) });
   const dial = dcOverlayEl.querySelector('[data-role="dial"]');
   if(dial) dcAttachDialDrag(dial);
 }
@@ -492,7 +524,7 @@ function dcTargetScreenHtml(){
   const rowsHtml = dcTargets.length ? dcTargets.map((d,i) => {
     const row = dcTable ? dcTable.get(d) : null;
     const elevStr = row && row.elevMil != null ? dcFmtElev(row.elevMil) : '—';
-    const windStr = row && row.driftMilPerMps != null ? dcFmtWindHold(row.driftMilPerMps) : '—';
+    const windStr = dcFmtRowRight(row);
     const active = dcActiveTargetIdx === i;
     return `<div class="dc-target-row${active?' dc-active':''}" data-idx="${i}">
       <span class="dc-target-num">T${i+1}</span>
@@ -530,7 +562,7 @@ function dcWireTargetScreen(){
   const effLabel = dcOverlayEl.querySelector('[data-role="efflabel"]');
   if(effLabel) dcAttachSwipeOrTap(effLabel, {
     onTap: () => dcGoScreen('wind'),
-    onSwipe: (logical) => dcAdjustWindSpeed(logical.dy < 0 ? 0.5 : -0.5),
+    onSwipe: (logical) => dcAdjustWindSpeed(logical.dy < 0 ? dcSettings.windStep : -dcSettings.windStep),
   });
 }
 
@@ -613,6 +645,13 @@ function dcRenderSetup(root){
       <label for="dcRangeInterval">Interval (m)</label>
       <input type="number" id="dcRangeInterval" step="5" value="${dcSettings.rangeInterval}">
 
+      <div class="st-field">Windstap (swipe op het windvak, m/s per stap)</div>
+      <div class="dryfire-mode-toggle">
+        <label><input type="radio" name="dcWindStep" value="0.5" ${dcSettings.windStep===0.5?'checked':''}> 0.5</label>
+        <label><input type="radio" name="dcWindStep" value="1" ${dcSettings.windStep===1?'checked':''}> 1.0</label>
+        <label><input type="radio" name="dcWindStep" value="2" ${dcSettings.windStep===2?'checked':''}> 2.0</label>
+      </div>
+
       <div class="st-field">Pols-modus</div>
       <div class="dryfire-mode-toggle">
         <label><input type="radio" name="dcWrist" value="device" ${dcSettings.wristMode==='device'?'checked':''}> Volg toestel</label>
@@ -641,6 +680,7 @@ function dcRenderSetup(root){
     dcSettings.rangeStart = parseFloat(root.querySelector('#dcRangeStart').value) || 0;
     dcSettings.rangeEnd = parseFloat(root.querySelector('#dcRangeEnd').value) || 0;
     dcSettings.rangeInterval = Math.max(1, parseFloat(root.querySelector('#dcRangeInterval').value) || 1);
+    dcSettings.windStep = parseFloat(root.querySelector('input[name="dcWindStep"]:checked').value);
     dcSettings.wristMode = root.querySelector('input[name="dcWrist"]:checked').value;
     dcSettings.theme = root.querySelector('input[name="dcTheme"]:checked').value;
   }

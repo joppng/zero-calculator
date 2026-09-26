@@ -263,6 +263,7 @@ const AC_AMMO_PRESETS = [
   { label:'7.62 M80 147gr', dragModel:'G7', bc:0.200, v0Ms:830 },
   { label:'7.62 M118LR 175gr', dragModel:'G7', bc:0.243, v0Ms:790 },
   { label:'6.5 CM 140gr ELD-M', dragModel:'G7', bc:0.326, v0Ms:820 },
+  { label:'.338 LM Lapua Scenar-L 250gr (Lock Base)', dragModel:'G7', bc:0.313, v0Ms:905 },
 ];
 
 function acRenderProfileEditor(root){
@@ -281,9 +282,13 @@ function acRenderProfileEditor(root){
           <label for="pfLabel">Naam / label</label>
           <input type="text" id="pfLabel" placeholder="bv. MSR .338 #2" value="${acEscapeHtml(p.label)}">
 
-          <label for="pfCaliber">Kaliber</label>
-          <input type="text" id="pfCaliber" list="pfCaliberList" placeholder="bv. .338 Lapua Mag" value="${acEscapeHtml(p.caliber)}">
-          <datalist id="pfCaliberList">${AC_CALIBERS.map(c=>`<option value="${c}">`).join('')}</datalist>
+          <label for="pfCaliberSelect">Kaliber</label>
+          <select id="pfCaliberSelect">
+            ${AC_CALIBERS.map(c=>`<option value="${c}" ${p.caliber===c?'selected':''}>${c}</option>`).join('')}
+            <option value="__custom__" ${!AC_CALIBERS.includes(p.caliber) ? 'selected' : ''}>Anders / handmatig</option>
+          </select>
+          <input type="text" id="pfCaliber" placeholder="bv. 9x19mm" value="${acEscapeHtml(p.caliber)}" ${AC_CALIBERS.includes(p.caliber) ? 'hidden' : ''}>
+          <!-- iOS Safari geeft een <input list=datalist> geen betrouwbare dropdown-UI — vandaar een echte <select>, met deze vrije-tekstinvoer als fallback voor kalibers die er niet in staan. -->
 
           <label for="pfTwist">Twist rate</label>
           <input type="text" id="pfTwist" placeholder="bv. 1:10" value="${acEscapeHtml(p.twistRateIn)}">
@@ -409,6 +414,19 @@ function acRenderProfileEditor(root){
 
   form.addEventListener('input', (e)=>{
     if(e.target.classList.contains('dope-windcall')) return; // has its own listener; avoid rebuilding the table mid-keystroke
+    syncDraftFromForm();
+    renderDopeTable();
+  });
+  root.querySelector('#pfCaliberSelect').addEventListener('change', (e)=>{
+    const customInput = form.querySelector('#pfCaliber');
+    if(e.target.value === '__custom__'){
+      customInput.hidden = false;
+      customInput.value = AC_CALIBERS.includes(p.caliber) ? '' : p.caliber;
+      customInput.focus();
+    } else {
+      customInput.hidden = true;
+      customInput.value = e.target.value;
+    }
     syncDraftFromForm();
     renderDopeTable();
   });

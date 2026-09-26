@@ -793,6 +793,9 @@ function initInstallBanner(){
 --------------------------------------------------------------------- */
 try {
   const CHANGELOG = [
+    { version:'v1.73', date:'26-09-2026', items:[
+      'Dope Card — verbeteringen na eerste test: het windvak overlapte soms met de regel eronder, opgelost met meer ruimte in het raster. Op het kruisje (✕) tikken sluit de Dope Card nu écht af — een volgende tik op de tab komt weer bij de instellingen uit, in plaats van meteen door te schieten naar fullscreen (via ⚙ of "Opslaan" start hij weer automatisch op). Het aparte richtmiddelhoogte-veld is verwijderd — de Dope Card gebruikt nu gewoon de hoogte uit het wapenprofiel zelf. Hoogte kan nu ook via de locatievoorziening van je toestel ingevuld worden (temperatuur/luchtdruk blijven handmatig, dat kan een telefoon niet meten). Kaliber bij Wapenprofielen is nu een echte dropdown (met "Anders/handmatig" voor vrije invoer) in plaats van een <datalist>, die op iOS Safari onbetrouwbaar was — en er is een .338 Lapua Mag-fabrieksladingpreset (Lapua Scenar-L 250gr Lock Base) bijgekomen.',
+    ]},
     { version:'v1.72', date:'26-09-2026', items:[
       'Dope Card: digitale pols-dope kaart met windklok, windholds en target card (max 3 doelen). Nieuwe tab na Contact — bij openen wordt het hele scherm de dope card (fullscreen, liggend, met een "pols-modus" om staand gedragen toestellen 90° te draaien voor de leesbaarheid). Gebruikt hetzelfde wapenprofiel als Wapenprofielen (kaliber/BC/V0/zero), met een eigen richtmiddelhoogte- en omgevingsinstelling (temperatuur/hoogte/luchtdruk). Windholds worden live doorgerekend zodra je de windsnelheid of -richting aanpast (swipe op het windvak, of sleep de wijzer op de windklok) — geen nieuwe berekening nodig. Werkt volledig offline, scherm blijft aan tijdens gebruik.',
     ]},

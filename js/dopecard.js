@@ -13,9 +13,14 @@ const DC_SETTINGS_KEY = 'ac_dopecard_settings_v1';
 const DC_WIND_KEY = 'ac_dopecard_wind_v1';
 const DC_TARGETS_KEY = 'ac_dopecard_targets_v1';
 
+// Moet in de pas blijven met .dc-wind-cell's flex-gewicht in css/styles.css —
+// het windvak toont 4 regels tekst en heeft dus meer ruimte nodig dan één
+// normale afstandsregel (gewicht 1); anders lopen label/sub-tekst over in
+// het blok eronder (precies het "streep door EFF WIND"-probleem).
+const DC_WIND_CELL_WEIGHT = 3;
+
 const DC_DEFAULT_SETTINGS = {
   activeProfileId: null,
-  hobSource: 'manual', sightId: 'manual_sight', mountId: 'none', hobMm: 70,
   envMode: 'altitude', envTempC: 15, envAltitudeM: 0, envPressureHpa: 1013.25,
   rangeStart: 200, rangeEnd: 980, rangeInterval: 20,
   wristMode: 'device', theme: 'day',
@@ -44,28 +49,23 @@ let dcWakeLock = null;
 let dcRotationDeg = 0;
 let dcOrientationMq = null;
 let dcFallbackVideo = null;
+// Alleen in-memory: gezet door ✕, gewist zodra de setup-screen weer bewust
+// wordt opgeslagen — een paginaherlaad zelf reset dit dus wél (dat blijft
+// gewoon "tik op tab -> direct fullscreen" als er al een profiel is).
+let dcAutoEnterSuppressed = false;
 
 /* ---- Profiel + HOB + atmosfeer -> ballistiek-tabel ---- */
 function dcGetActiveProfile(){
   const profiles = window.AppliedConceptsProfiles.load();
   return profiles.find(p => p.id === dcSettings.activeProfileId) || null;
 }
-function dcComputeHobMm(){
-  if(dcSettings.hobSource !== 'auto') return dcSettings.hobMm;
-  const sight = SIGHTS.find(s => s.id === dcSettings.sightId);
-  const mount = MOUNTS.find(m => m.id === dcSettings.mountId);
-  if(!sight || !mount) return dcSettings.hobMm;
-  let hobIn = null;
-  if(mount.id !== 'none' && mount.id !== 'manual_mount') hobIn = mount.hobIn;
-  else if(mount.id === 'none') hobIn = sight.hobIn;
-  return hobIn != null ? hobIn * 25.4 : dcSettings.hobMm;
-}
 function dcRecomputeTable(){
   const profile = dcGetActiveProfile();
   if(!profile){ dcTable = null; return false; }
+  // Richtmiddelhoogte komt rechtstreeks uit het wapenprofiel zelf
+  // (toBallisticsInput's sightHeightCm) — geen aparte Dope Card-instelling.
   const input = window.AppliedConceptsProfiles.toBallisticsInput(profile);
   if(!input){ dcTable = null; return false; }
-  input.sightHeightCm = dcComputeHobMm() / 10;
   const atmInput = { tempC: dcSettings.envTempC };
   if(dcSettings.envMode === 'pressure') atmInput.pressureHpa = dcSettings.envPressureHpa;
   else atmInput.altitudeM = dcSettings.envAltitudeM;
@@ -115,7 +115,7 @@ function dcFitCheck(){
   const cols = dcColumnsFrom(blocks);
   const colWeights = cols.map((colBlocks, ci) => {
     let w = colBlocks.reduce((sum,b) => sum + b.distances.length, 0);
-    if(ci === 0) w += 1; // windvak
+    if(ci === 0) w += DC_WIND_CELL_WEIGHT;
     return w;
   });
   const maxWeight = Math.max(1, ...colWeights);
@@ -337,12 +337,19 @@ function dcTeardownFullscreen(){
   dcOverlayEl.remove();
   dcOverlayEl = null;
 }
-// returnTo 'setup' = ⚙ (blijft op de Dope Card-tab, normale layout);
-// 'app' = ✕ (verlaat Dope Card helemaal, terug naar de Zero Optic Calculator).
+// returnTo 'setup' = ⚙ (blijft op de Dope Card-tab, normale layout, tik op
+// de tab opent daarna gewoon weer direct fullscreen); 'app' = ✕ (sluit de
+// Dope Card echt af — een volgende tik op de tab komt dan weer bij de
+// instellingen uit, in plaats van meteen door te schieten naar fullscreen,
+// tot je hem via "Opslaan & open Dope Card" bewust opnieuw start).
 function dcExitFullscreen(returnTo){
   dcTeardownFullscreen();
-  if(returnTo === 'app'){ if(typeof switchTab === 'function') switchTab('optic'); }
-  else { dcRenderSetupScreenIfActive(); }
+  if(returnTo === 'app'){
+    dcAutoEnterSuppressed = true;
+    if(typeof switchTab === 'function') switchTab('optic');
+  } else {
+    dcRenderSetupScreenIfActive();
+  }
 }
 function dcGoScreen(s){ dcScreen = s; dcRenderFullscreen(); }
 
@@ -377,7 +384,7 @@ function dcDopeScreenHtml(){
 
   const colsHtml = cols.map((colBlocks, ci) => {
     const windCellHtml = ci === 0 ? `
-      <div class="dc-wind-cell" data-role="windcell">
+      <div class="dc-wind-cell" data-role="windcell" style="flex:${DC_WIND_CELL_WEIGHT} 1 0;">
         <span class="dc-wind-badge">${dir || '—'}</span>
         <span class="dc-wind-value">${dcEffWind().eff.toFixed(1)}</span>
         <span class="dc-wind-label">EFF WIND m/s</span>
@@ -584,28 +591,6 @@ function dcRenderSetup(root){
     </fieldset>
 
     <fieldset class="dryfire-mode-fieldset">
-      <legend>Richtmiddelhoogte (HOB)</legend>
-      <div class="dryfire-mode-toggle">
-        <label><input type="radio" name="dcHobSource" value="auto" ${dcSettings.hobSource==='auto'?'checked':''}> Richtmiddel + montage</label>
-        <label><input type="radio" name="dcHobSource" value="manual" ${dcSettings.hobSource==='manual'?'checked':''}> Handmatig</label>
-      </div>
-      <div id="dcHobAutoFields" ${dcSettings.hobSource!=='auto'?'hidden':''}>
-        <div class="dc-hob-row">
-          <div>
-            <label for="dcSight">Richtmiddel</label>
-            <select id="dcSight">${SIGHTS.map(s=>`<option value="${s.id}" ${s.id===dcSettings.sightId?'selected':''}>${s.label}</option>`).join('')}</select>
-          </div>
-          <div>
-            <label for="dcMount">Montage</label>
-            <select id="dcMount">${MOUNTS.map(m=>`<option value="${m.id}" ${m.id===dcSettings.mountId?'selected':''}>${m.label}</option>`).join('')}</select>
-          </div>
-        </div>
-      </div>
-      <label for="dcHobMm">Richtmiddelhoogte (mm)</label>
-      <input type="number" id="dcHobMm" step="1" min="0" value="${dcSettings.hobMm}">
-    </fieldset>
-
-    <fieldset class="dryfire-mode-fieldset">
       <legend>Omgeving</legend>
       <label for="dcTemp">Temperatuur (°C)</label>
       <input type="number" id="dcTemp" step="1" value="${dcSettings.envTempC}">
@@ -615,6 +600,8 @@ function dcRenderSetup(root){
       </div>
       <input type="number" id="dcAltitude" step="10" value="${dcSettings.envAltitudeM}" ${dcSettings.envMode!=='altitude'?'hidden':''}>
       <input type="number" id="dcPressure" step="1" value="${dcSettings.envPressureHpa}" ${dcSettings.envMode!=='pressure'?'hidden':''}>
+      <button type="button" class="printbtn st-btn-secondary" id="dcUseLocationBtn" style="width:auto;padding:9px 16px;margin-top:8px;" ${dcSettings.envMode!=='altitude'?'hidden':''}>Hoogte via locatie</button>
+      <p class="hint" id="dcLocationHint">Vult de hoogte in via de locatievoorziening van je toestel (GPS) — temperatuur en luchtdruk kan de telefoon niet meten en blijven dus handmatig.</p>
     </fieldset>
 
     <fieldset class="dryfire-mode-fieldset">
@@ -647,10 +634,6 @@ function dcRenderSetup(root){
 
   function syncFromForm(){
     dcSettings.activeProfileId = root.querySelector('#dcProfile').value;
-    dcSettings.hobSource = root.querySelector('input[name="dcHobSource"]:checked').value;
-    dcSettings.sightId = root.querySelector('#dcSight').value;
-    dcSettings.mountId = root.querySelector('#dcMount').value;
-    dcSettings.hobMm = parseFloat(root.querySelector('#dcHobMm').value) || 0;
     dcSettings.envTempC = parseFloat(root.querySelector('#dcTemp').value) || 0;
     dcSettings.envMode = root.querySelector('input[name="dcEnvMode"]:checked').value;
     dcSettings.envAltitudeM = parseFloat(root.querySelector('#dcAltitude').value) || 0;
@@ -672,21 +655,33 @@ function dcRenderSetup(root){
   }
 
   root.addEventListener('change', (e) => {
-    if(e.target.name === 'dcHobSource') root.querySelector('#dcHobAutoFields').hidden = e.target.value !== 'auto';
     if(e.target.name === 'dcEnvMode'){
       root.querySelector('#dcAltitude').hidden = e.target.value !== 'altitude';
       root.querySelector('#dcPressure').hidden = e.target.value !== 'pressure';
-    }
-    if(e.target.id === 'dcSight' || e.target.id === 'dcMount'){
-      const sight = SIGHTS.find(s=>s.id===root.querySelector('#dcSight').value);
-      const mount = MOUNTS.find(m=>m.id===root.querySelector('#dcMount').value);
-      let hobIn = null;
-      if(mount.id !== 'none' && mount.id !== 'manual_mount') hobIn = mount.hobIn;
-      else if(mount.id === 'none') hobIn = sight.hobIn;
-      if(hobIn != null) root.querySelector('#dcHobMm').value = (hobIn*25.4).toFixed(0);
+      root.querySelector('#dcUseLocationBtn').hidden = e.target.value !== 'altitude';
     }
     syncFromForm();
     renderPreview();
+  });
+
+  root.querySelector('#dcUseLocationBtn').addEventListener('click', () => {
+    const hint = root.querySelector('#dcLocationHint');
+    if(!navigator.geolocation){ hint.textContent = 'Locatievoorziening niet beschikbaar op dit toestel.'; return; }
+    hint.textContent = 'Locatie opvragen…';
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        if(pos.coords.altitude == null){
+          hint.textContent = 'Toestel gaf geen hoogte mee bij deze locatiebepaling — vul handmatig in.';
+          return;
+        }
+        const altM = Math.round(pos.coords.altitude);
+        root.querySelector('#dcAltitude').value = altM;
+        dcSettings.envAltitudeM = altM;
+        hint.textContent = `Hoogte ingevuld via locatie: ${altM} m. Temperatuur en luchtdruk blijven handmatig.`;
+      },
+      (err) => { hint.textContent = 'Locatie niet beschikbaar (toegang geweigerd of mislukt) — vul handmatig in.'; },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
   });
 
   root.querySelector('#dcSaveBtn').addEventListener('click', () => {
@@ -701,6 +696,7 @@ function dcRenderSetup(root){
     errEl.textContent = '';
     if(!dcFitCheck().fits) return;
     dcSave(DC_SETTINGS_KEY, dcSettings);
+    dcAutoEnterSuppressed = false;
     dcRecomputeTable();
     dcEnterFullscreen();
   });
@@ -713,7 +709,7 @@ function initDopeCard(){
   const root = document.getElementById('dopecardRoot');
   const profile = dcGetActiveProfile();
   const input = profile ? window.AppliedConceptsProfiles.toBallisticsInput(profile) : null;
-  if(input){
+  if(input && !dcAutoEnterSuppressed){
     dcRecomputeTable();
     dcEnterFullscreen();
   } else {

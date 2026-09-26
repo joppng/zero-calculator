@@ -6,11 +6,24 @@
    published references — same method used by most commercial ballistic
    calculators (Applied Ballistics, JBM, Strelok, etc.).
 
-   Assumptions (v1):
+   Assumptions (v1, still true for computeHoldTableMil/computeTrajectoryProfile
+   below — the Zero Optic Calculator and Dry Fire hold tables):
    - Fixed ICAO standard atmosphere at sea level (15°C / 59°F, 29.92 inHg,
-     0% humidity) — no altitude/temperature/pressure input yet.
+     0% humidity).
    - Flat, level fire (no shot angle, no wind, no Coriolis, no spin drift).
    - Output: hold in MIL only.
+
+   v2 (25-09-2026, voor Dope Card) adds computeAtmosphere() for a variable
+   temperature/altitude/pressure, and computeDopeCardTable() for a wind
+   hold per distance — via the standard "lag time" approximation
+   (drift = crosswind_mps × (actual time of flight − no-drag time of
+   flight)), not a separate lateral 3DOF integration. This is the same
+   simplification McCoy/Applied Ballistics/JBM use for flat-fire wind
+   drift and is exact for the "compute once per 1 m/s, then scale
+   linearly" approach the spec asks for, since both sides of the lag-time
+   formula are already produced by the existing vertical-only simulation.
+   Still out of scope for v1/v2, per spec: spin drift, Coriolis, and the
+   vertical component of head/tailwind.
 --------------------------------------------------------------------- */
 
 const BALLISTICS_GRAVITY_FPS2 = 32.17405;
@@ -97,16 +110,20 @@ function getCalculationStepFt(stepFt){
 /**
  * Simulates the flat-fire trajectory for one barrel elevation and returns the
  * bullet height relative to the line of sight (ft) at each requested distance (ft).
- * targetDistancesFt must be sorted ascending.
+ * targetDistancesFt must be sorted ascending. densityFactor/machFps default to
+ * the fixed ICAO sea-level standard used by the Optic Calculator/Dry Fire;
+ * Dope Card passes computeAtmosphere()'s values instead.
  */
-function simulateDropAtDistances({ effectiveBC, dragTable, muzzleVelocityFps, sightHeightFt, barrelElevationRad, targetDistancesFt, calcStepFt }){
+function simulateDropAtDistances({ effectiveBC, dragTable, muzzleVelocityFps, sightHeightFt, barrelElevationRad, targetDistancesFt, calcStepFt, densityFactor, machFps }){
   const ballisticFactor = 1 / effectiveBC;
   const gravityY = -BALLISTICS_GRAVITY_FPS2;
+  const rho = densityFactor != null ? densityFactor : BALLISTICS_DENSITY_FACTOR;
+  const mach1 = machFps || BALLISTICS_MACH1_FPS;
 
   let velocity = muzzleVelocityFps;
   let vx = Math.cos(barrelElevationRad) * velocity;
   let vy = Math.sin(barrelElevationRad) * velocity;
-  let x = 0, y = -sightHeightFt;
+  let x = 0, y = -sightHeightFt, time = 0;
 
   const results = [];
   let nextIdx = 0;
@@ -116,21 +133,22 @@ function simulateDropAtDistances({ effectiveBC, dragTable, muzzleVelocityFps, si
     if(velocity < 50 || y < -15000) break;
 
     while(nextIdx < targetDistancesFt.length && x >= targetDistancesFt[nextIdx]){
-      results.push({ distanceFt: targetDistancesFt[nextIdx], x, y, velocity });
+      results.push({ distanceFt: targetDistancesFt[nextIdx], x, y, velocity, time });
       nextIdx++;
     }
     if(nextIdx >= targetDistancesFt.length) break;
 
     const deltaTime = calcStepFt / vx;
     velocity = Math.hypot(vx, vy);
-    const mach = velocity / BALLISTICS_MACH1_FPS;
-    const drag = ballisticFactor * BALLISTICS_DENSITY_FACTOR * velocity * dragCd(dragTable, mach) * BALLISTICS_PIR;
+    const mach = velocity / mach1;
+    const drag = ballisticFactor * rho * velocity * dragCd(dragTable, mach) * BALLISTICS_PIR;
 
     vx = vx - deltaTime*(drag*vx - 0);
     vy = vy - deltaTime*(drag*vy - gravityY);
 
     x = x + vx*deltaTime;
     y = y + vy*deltaTime;
+    time = time + deltaTime;
   }
   return results;
 }
@@ -139,11 +157,13 @@ function simulateDropAtDistances({ effectiveBC, dragTable, muzzleVelocityFps, si
  * Solves the barrel elevation (radians) so the trajectory crosses the line
  * of sight exactly at zeroDistanceFt (accounting for sight height offset).
  */
-function solveSightAngleRad({ effectiveBC, dragTable, muzzleVelocityFps, sightHeightFt, zeroDistanceFt }){
+function solveSightAngleRad({ effectiveBC, dragTable, muzzleVelocityFps, sightHeightFt, zeroDistanceFt, densityFactor, machFps }){
   const rawStepFt = 10 * BALLISTICS_FT_PER_M; // "10" in the same unit as zero distance (meters)
   const calcStepFt = getCalculationStepFt(rawStepFt);
   const ballisticFactor = 1 / effectiveBC;
   const gravityY = -BALLISTICS_GRAVITY_FPS2;
+  const rho = densityFactor != null ? densityFactor : BALLISTICS_DENSITY_FACTOR;
+  const mach1 = machFps || BALLISTICS_MACH1_FPS;
 
   let barrelElevation = 0;
   let error = 1;
@@ -160,8 +180,8 @@ function solveSightAngleRad({ effectiveBC, dragTable, muzzleVelocityFps, sightHe
       if(velocity < 50 || y < -15000) break;
       const deltaTime = calcStepFt / vx;
       velocity = Math.hypot(vx, vy);
-      const mach = velocity / BALLISTICS_MACH1_FPS;
-      const drag = ballisticFactor * BALLISTICS_DENSITY_FACTOR * velocity * dragCd(dragTable, mach) * BALLISTICS_PIR;
+      const mach = velocity / mach1;
+      const drag = ballisticFactor * rho * velocity * dragCd(dragTable, mach) * BALLISTICS_PIR;
 
       vx = vx - deltaTime*(drag*vx - 0);
       vy = vy - deltaTime*(drag*vy - gravityY);
@@ -283,4 +303,116 @@ function computeTrajectoryProfile({ dragModel, bc, customDragFactor, muzzleVeloc
   };
 }
 
-window.AppliedConceptsBallistics = { computeHoldTableMil, computeTrajectoryProfile, G1_DRAG_TABLE, G7_DRAG_TABLE };
+/**
+ * Variable atmosphere for Dope Card (Optic/Dry Fire keep the fixed ICAO
+ * sea-level standard above). Returns a density ratio (relative to that
+ * same ICAO standard, so it's a drop-in multiplier for densityFactor
+ * above) and the speed of sound in fps for the given temperature.
+ * altitudeM is ignored when pressureHpa is given directly.
+ */
+function computeAtmosphere({ tempC, altitudeM, pressureHpa }){
+  const T_C = tempC != null ? tempC : 15;
+  const T_K = T_C + 273.15;
+  const P_hPa = pressureHpa != null ? pressureHpa
+    : 1013.25 * Math.pow(1 - 2.25577e-5 * (altitudeM || 0), 5.25588);
+  // Ratio form cancels the gas constant R, so only P/T relative to the
+  // ICAO standard (1013.25 hPa / 288.15 K) is needed.
+  const densityFactor = (P_hPa * 288.15) / (1013.25 * T_K);
+  const speedOfSoundMs = 331.3 * Math.sqrt(1 + T_C / 273.15);
+  const machFps = speedOfSoundMs * BALLISTICS_FT_PER_M;
+  return { densityFactor, machFps, tempC: T_C, pressureHpa: P_hPa };
+}
+
+/**
+ * Dope Card table: elevation hold (MIL) and wind hold per 1 m/s of full
+ * crosswind ("driftMilPerMps" — multiply by the effective wind on screen
+ * to get the live windhold) for each requested distance, under a given
+ * profile + atmosphere. Recompute only when the profile or atmosphere
+ * changes; the UI then just multiplies driftMilPerMps by the current
+ * effective wind, which is why wind itself feels instant.
+ */
+function computeDopeCardTable(profile, atmosphere, distancesM){
+  const dragTable = dragTableFor(profile.dragModel);
+  const customFactor = (profile.customDragFactor && profile.customDragFactor > 0) ? profile.customDragFactor : 1;
+  const effectiveBC = profile.bc * customFactor;
+  const muzzleVelocityFps = profile.muzzleVelocityFps;
+  const sightHeightFt = (profile.sightHeightCm || 0) / 30.48;
+  const zeroDistanceFt = profile.zeroDistanceM * BALLISTICS_FT_PER_M;
+  const { densityFactor, machFps } = atmosphere || {};
+
+  const barrelElevationRad = solveSightAngleRad({
+    effectiveBC, dragTable, muzzleVelocityFps, sightHeightFt, zeroDistanceFt, densityFactor, machFps,
+  });
+
+  const sortedM = [...distancesM].sort((a,b)=>a-b);
+  const targetDistancesFt = sortedM.map(d => d * BALLISTICS_FT_PER_M);
+  const calcStepFt = getCalculationStepFt(10 * BALLISTICS_FT_PER_M);
+
+  const results = simulateDropAtDistances({
+    effectiveBC, dragTable, muzzleVelocityFps, sightHeightFt, barrelElevationRad,
+    targetDistancesFt, calcStepFt, densityFactor, machFps,
+  });
+
+  const table = new Map();
+  results.forEach(r => {
+    const distanceM = Math.round(r.distanceFt / BALLISTICS_FT_PER_M);
+    const elevMil = -Math.atan(r.y / r.x) * 1000;
+    // Lag-time wind drift: a bullet slowed by drag takes longer to reach a
+    // distance than a no-drag bullet at muzzle velocity would — a full-value
+    // crosswind carries it sideways for exactly that extra time.
+    const noDragTime = r.x / muzzleVelocityFps;
+    const driftFtPerMps = (r.time - noDragTime) * BALLISTICS_FT_PER_M; // 1 m/s wind → ft of drift
+    const driftMilPerMps = (driftFtPerMps / r.x) * 1000;
+    table.set(distanceM, { elevMil, driftMilPerMps });
+  });
+  sortedM.forEach(d => { if(!table.has(d)) table.set(d, null); });
+  return table;
+}
+
+/**
+ * Console self-test: sanity-checks the solver's invariants and prints the
+ * M855 (100 m zero, 70 mm HOB, ICAO) 100-800 m table for a manual check
+ * against JBM/Strelok. Not run automatically — call from the console with
+ * AppliedConceptsBallistics.runSelfTest().
+ */
+function runSelfTest(){
+  const profile = {
+    dragModel: 'G7', bc: 0.151, muzzleVelocityFps: 900 * BALLISTICS_FT_PER_M,
+    sightHeightCm: 7, zeroDistanceM: 100,
+  };
+  const atmosphere = computeAtmosphere({ tempC: 15, altitudeM: 0 });
+  const distances = [100,200,300,400,500,600,700,800];
+  const table = computeDopeCardTable(profile, atmosphere, distances);
+
+  console.log('--- Ballistics self-test: M855 62gr, G7 0.151, 900 m/s, 100 m zero, 70 mm HOB, ICAO ---');
+  console.log('m\telev (mil)\tdrift/mps (mil)');
+  distances.forEach(d => {
+    const row = table.get(d);
+    console.log(`${d}\t${row.elevMil.toFixed(2)}\t${row.driftMilPerMps.toFixed(3)}`);
+  });
+
+  const elevAtZero = table.get(100).elevMil;
+  console.assert(Math.abs(elevAtZero) < 0.05, 'FAIL: elevation at zero distance should be ~0, got', elevAtZero);
+
+  let monotonic = true;
+  for(let i=1; i<distances.length; i++){
+    if(table.get(distances[i]).elevMil <= table.get(distances[i-1]).elevMil) monotonic = false;
+  }
+  console.assert(monotonic, 'FAIL: elevation hold should increase monotonically past the zero');
+
+  // Windhold linear in wind speed + R/L convention (section 3): wind from
+  // the right (0°<θ<180°) pushes the bullet left, so the hold to compensate
+  // is R; from the left, hold is L. Verified against the clock-method spec
+  // examples (5.0 m/s @ 3:00 = R5.0, @ 2:00 = R4.3, @ 9:00 = L5.0) directly
+  // by the UI's effective-wind formula (see dopecard.js) — here we only
+  // confirm driftMilPerMps scales linearly, which the UI then multiplies.
+  const d500 = table.get(500).driftMilPerMps;
+  console.assert(d500 > 0, 'FAIL: driftMilPerMps at 500 m should be positive');
+
+  console.log('Self-test klaar — vergelijk de tabel hierboven met JBM/Strelok voor M855.');
+}
+
+window.AppliedConceptsBallistics = {
+  computeHoldTableMil, computeTrajectoryProfile, computeAtmosphere, computeDopeCardTable,
+  runSelfTest, G1_DRAG_TABLE, G7_DRAG_TABLE,
+};

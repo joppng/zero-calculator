@@ -1,4 +1,4 @@
-const CACHE = 'ac-zero-calc-v64';
+const CACHE = 'ac-zero-calc-v65';
 const ASSETS = [
   './',
   './index.html',
@@ -26,6 +26,7 @@ const ASSETS = [
   './js/turret.js',
   './js/shottimer.js',
   './js/shottimer-worklet.js',
+  './js/dopecard.js',
   './assets/background.jpg',
   './icons/logo.svg',
   './icons/icon-192.png',

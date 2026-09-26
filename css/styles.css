@@ -879,3 +879,101 @@
        before — just without the bleed-through on opaque surfaces. */
     .appshell{position:relative;z-index:1;}
   }
+
+  /* ---- Dope Card: setup screen (normal app layout) ---- */
+  .dc-hob-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .dc-preview-box{background:#0c0c0a;border:1px solid var(--line);border-radius:var(--radius-sm);padding:12px 14px;margin:14px 0;font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:var(--cream-dim);}
+  .dc-preview-box.dc-preview-warn{border-color:var(--danger);color:#f0b39e;}
+  .dc-preview-box strong{color:var(--cream);}
+  .dc-noprofile{background:var(--panel-2);border:1px solid var(--line);border-radius:var(--radius);padding:16px;text-align:center;}
+
+  /* ---- Dope Card: fullscreen overlay ---- */
+  .dc-overlay{
+    position:fixed;inset:0;z-index:9999;
+    padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    background:var(--dcbg);color:var(--dcfg);
+    font-family:ui-monospace,'IBM Plex Mono',monospace;
+    touch-action:none;-webkit-user-select:none;user-select:none;overscroll-behavior:none;
+  }
+  .dc-overlay.dc-theme-day{--dcbg:#f2ede0;--dcfg:#15140f;--dcbadge-bg:#15140f;--dcbadge-fg:#f2ede0;--dcline:rgba(21,20,15,.22);--dcline-strong:rgba(21,20,15,.55);--dcdim:rgba(21,20,15,.55);--dcwatermark-filter:invert(1);}
+  .dc-overlay.dc-theme-night{--dcbg:#000;--dcfg:rgba(242,236,217,.8);--dcbadge-bg:#f2ecd9;--dcbadge-fg:#000;--dcline:rgba(242,236,217,.18);--dcline-strong:rgba(242,236,217,.4);--dcdim:rgba(242,236,217,.5);--dcwatermark-filter:none;}
+  .dc-rotor{width:100%;height:100%;display:flex;}
+  .dc-overlay.dc-rot-left .dc-rotor,.dc-overlay.dc-rot-right .dc-rotor{position:fixed;top:50%;left:50%;width:100dvh;height:100dvw;}
+  .dc-overlay.dc-rot-left .dc-rotor{transform:translate(-50%,-50%) rotate(-90deg);}
+  .dc-overlay.dc-rot-right .dc-rotor{transform:translate(-50%,-50%) rotate(90deg);}
+  .dc-main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;position:relative;overflow:hidden;}
+  .dc-strip{flex:0 0 50px;display:flex;flex-direction:column;border-left:1px solid var(--dcline-strong);}
+  .dc-strip-btn{
+    flex:1 1 0;min-height:44px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background:none;border:none;border-bottom:1px solid var(--dcline);color:var(--dcfg);
+    font-family:ui-monospace,'IBM Plex Mono',monospace;font-size:15px;font-weight:600;cursor:pointer;gap:2px;
+  }
+  .dc-strip-btn:last-child{border-bottom:none;}
+  .dc-strip-btn.dc-dim{opacity:.4;}
+  .dc-strip-btn span{font-size:10px;font-weight:400;}
+
+  /* Dope grid */
+  .dc-grid{flex:1 1 auto;display:flex;min-height:0;}
+  .dc-grid-col{flex:1 1 0;display:flex;flex-direction:column;min-width:0;border-right:1px solid var(--dcline-strong);}
+  .dc-grid-col:last-child{border-right:none;}
+  .dc-wind-cell{
+    flex:1 1 0;min-height:0;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;
+    padding:4px 10px;border-bottom:2px solid var(--dcline-strong);cursor:pointer;position:relative;
+  }
+  .dc-wind-badge{background:var(--dcbadge-bg);color:var(--dcbadge-fg);font-weight:700;padding:1px 6px;font-size:12px;margin-bottom:2px;}
+  .dc-wind-value{font-size:clamp(20px,4vw,34px);font-weight:700;line-height:1;}
+  .dc-wind-label{font-size:9px;color:var(--dcdim);text-transform:uppercase;letter-spacing:.04em;margin-top:3px;}
+  .dc-wind-sub{font-size:9px;color:var(--dcdim);}
+  .dc-block{display:flex;flex-direction:column;border-bottom:2px solid var(--dcline-strong);min-height:0;}
+  .dc-block:last-child{border-bottom:none;}
+  .dc-row{
+    flex:1 1 0;display:flex;align-items:center;min-height:0;border-bottom:1px solid var(--dcline);
+    font-weight:700;font-size:clamp(11px,2.6vw,16px);cursor:pointer;padding:0 6px;gap:6px;
+  }
+  .dc-block .dc-row:last-child{border-bottom:none;}
+  .dc-row-dist{flex:0 0 auto;font-weight:400;font-size:.7em;color:var(--dcdim);min-width:1.8em;}
+  .dc-row-dist.dc-badge{background:var(--dcbadge-bg);color:var(--dcbadge-fg);font-weight:700;padding:1px 5px;font-size:.75em;}
+  .dc-row-elev{flex:1 1 0;text-align:center;}
+  .dc-row-wind{flex:0 0 auto;min-width:2.6em;text-align:right;}
+  .dc-row.dc-selected{background:var(--dcfg);color:var(--dcbg);}
+  .dc-row.dc-selected .dc-row-dist{background:var(--dcbg);color:var(--dcfg);}
+
+  .dc-toast{
+    position:absolute;left:50%;top:16px;transform:translateX(-50%);background:var(--dcbadge-bg);color:var(--dcbadge-fg);
+    padding:8px 16px;font-size:13px;font-weight:600;z-index:2;pointer-events:none;
+  }
+
+  /* Wind screen */
+  .dc-wind-screen{flex:1 1 auto;display:flex;min-height:0;}
+  .dc-wind-left{flex:0 0 40%;display:flex;flex-direction:column;padding:14px;min-width:0;}
+  .dc-wind-back{background:none;border:none;color:var(--dcfg);font-family:inherit;font-size:14px;font-weight:700;text-align:left;padding:6px 0;cursor:pointer;min-height:44px;}
+  .dc-wind-speed-label{font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--dcdim);margin-top:16px;}
+  .dc-wind-speed-value{font-size:clamp(40px,9vw,72px);font-weight:700;line-height:1;text-align:center;margin:6px 0;}
+  .dc-wind-speed-hint{font-size:10px;color:var(--dcdim);text-align:center;}
+  .dc-wind-pm{display:flex;justify-content:center;gap:16px;margin:10px 0;}
+  .dc-wind-pm button{width:44px;height:44px;font-size:20px;font-weight:700;background:none;border:1px solid var(--dcline-strong);color:var(--dcfg);cursor:pointer;}
+  .dc-eff-box{border:1px solid var(--dcline-strong);padding:10px;margin-top:auto;text-align:center;}
+  .dc-eff-box-label{font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--dcdim);}
+  .dc-eff-box-value{font-size:clamp(26px,5vw,40px);font-weight:700;}
+  .dc-wind-right{flex:1 1 0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:10px;min-width:0;position:relative;}
+  .dc-dial-tgt{font-size:12px;font-weight:700;letter-spacing:.08em;margin-bottom:4px;}
+  .dc-dial-wrap{position:relative;width:min(90%,60vh);aspect-ratio:1;}
+  .dc-dial-svg{width:100%;height:100%;}
+  .dc-dial-watermark{position:absolute;inset:12%;background-repeat:no-repeat;background-position:center;background-size:contain;opacity:.09;filter:var(--dcwatermark-filter);pointer-events:none;}
+
+  /* Target card */
+  .dc-target-screen{flex:1 1 auto;display:flex;flex-direction:column;min-height:0;position:relative;}
+  .dc-target-watermark{position:absolute;inset:0;background-repeat:no-repeat;background-position:center;background-size:40%;opacity:.06;filter:var(--dcwatermark-filter);pointer-events:none;}
+  .dc-target-head{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid var(--dcline-strong);position:relative;z-index:1;}
+  .dc-target-title{display:flex;align-items:center;gap:10px;font-size:14px;font-weight:700;letter-spacing:.05em;}
+  .dc-target-clr{background:none;border:1px solid var(--dcline-strong);color:var(--dcfg);font-family:inherit;font-size:11px;font-weight:700;padding:5px 10px;cursor:pointer;min-height:32px;}
+  .dc-target-eff{font-size:14px;font-weight:700;cursor:pointer;}
+  .dc-target-rows{flex:1 1 auto;display:flex;flex-direction:column;min-height:0;position:relative;z-index:1;}
+  .dc-target-row{flex:1 1 0;display:flex;align-items:center;gap:14px;padding:0 16px;border-bottom:1px solid var(--dcline);cursor:pointer;min-height:0;}
+  .dc-target-row:last-child{border-bottom:none;}
+  .dc-target-row.dc-active .dc-target-num{background:var(--dcfg);color:var(--dcbg);}
+  .dc-target-num{flex:0 0 auto;background:var(--dcbadge-bg);color:var(--dcbadge-fg);font-weight:700;font-size:14px;padding:4px 8px;}
+  .dc-target-rng{flex:0 0 auto;font-size:clamp(14px,2.6vw,20px);color:var(--dcdim);min-width:3.5em;}
+  .dc-target-vals{flex:1 1 0;text-align:right;font-size:clamp(20px,5vw,40px);font-weight:700;}
+  .dc-target-empty{flex:1 1 auto;display:flex;align-items:center;justify-content:center;color:var(--dcdim);font-size:14px;text-align:center;padding:20px;}
+  .dc-flash{background:var(--dcfg) !important;color:var(--dcbg) !important;}

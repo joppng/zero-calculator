@@ -42,7 +42,7 @@
 <div class="mobile-watermark" aria-hidden="true"></div>
 <div class="appshell" id="appshell">
   <header class="masthead">
-    <button class="versionlink" id="versionLink">v1.71</button>
+    <button class="versionlink" id="versionLink">v1.72</button>
     <div class="mh-brand">
       <img src="icons/logo.svg" alt="Applied Concepts logo">
       <div class="wordmark">
@@ -61,6 +61,7 @@
     <span class="tabbar-divider"></span>
     <button class="tabbtn tabbtn-shop" data-tab="shop">Shop</button>
     <button class="tabbtn" data-tab="contact">Contact</button>
+    <button class="tabbtn" data-tab="dopecard">Dope Card</button>
   </nav>
 
   <nav class="mobile-bottombar" id="mobileBottombar">
@@ -116,6 +117,10 @@
       <button type="button" class="more-sheet-item" data-tab="shottimer">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 16 14"/></svg>
         Shottimer
+      </button>
+      <button type="button" class="more-sheet-item" data-tab="dopecard">
+        <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="1"/><line x1="7" y1="9" x2="17" y2="9"/><line x1="7" y1="13" x2="12" y2="13"/></svg>
+        Dope Card
       </button>
     </div>
   </div>
@@ -557,6 +562,11 @@
       </div>
     </div>
   </div>
+
+  <!-- ===================== DOPE CARD TAB ===================== -->
+  <div class="simplepanel tabpanel" id="panel-dopecard">
+    <div class="simplepanel-inner" id="dopecardRoot"></div>
+  </div>
 </div>
 
 <script src="js/qr-app.js"></script>
@@ -567,6 +577,7 @@
 <script src="js/contact.js"></script>
 <script src="js/train.js"></script>
 <script src="js/shottimer.js"></script>
+<script src="js/dopecard.js"></script>
 <script src="js/turret.js"></script>
 <script src="js/app.js"></script>
 <script>

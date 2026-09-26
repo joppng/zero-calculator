@@ -94,7 +94,13 @@ function acBcSanityError(bc, customDragFactor){
   return null;
 }
 
-function acProfileHoldTable(profile){
+// Raw stored profile -> the {dragModel,bc,customDragFactor,muzzleVelocityFps,
+// sightHeightCm,zeroDistanceM} shape the ballistics solver takes, with unit
+// conversion and BC sanity-checking applied. Shared by the hold-table
+// functions below and by Dope Card (which needs the same conversion but
+// feeds its own distances/atmosphere into computeDopeCardTable instead of
+// computeHoldTableMil's fixed-ICAO table).
+function acProfileToBallisticsInput(profile){
   const muzzleVelocityFps = acMuzzleVelocityFps(profile);
   if(!profile.bc || !muzzleVelocityFps || !profile.zeroDistanceM) return null;
   const bc = parseFloat(profile.bc);
@@ -109,6 +115,12 @@ function acProfileHoldTable(profile){
     zeroDistanceM: parseFloat(profile.zeroDistanceM),
   };
   if(!(input.bc > 0) || !(input.muzzleVelocityFps > 0) || !(input.zeroDistanceM > 0)) return null;
+  return input;
+}
+
+function acProfileHoldTable(profile){
+  const input = acProfileToBallisticsInput(profile);
+  if(!input) return null;
   try {
     return window.AppliedConceptsBallistics.computeHoldTableMil(input, AC_DOPE_DISTANCES_M);
   } catch(e){
@@ -240,6 +252,19 @@ function acRenderProfileList(root){
 
 const AC_CALIBERS = ['.308 Win','.300 Win Mag','.300 PRC','.338 Lapua Mag','.338 Norma Mag','6.5 Creedmoor','6.5 PRC','7.62x51mm NATO','.50 BMG'];
 
+// Indicatieve fabrieksladingen — vult dragModel/BC/V0 in ter referentie; de
+// gebruiker wordt er expliciet op gewezen dat dit een startpunt is, geen
+// vervanging voor een eigen chrono/dope. Toegevoegd voor Dope Card, maar
+// hoort hier thuis: het is dezelfde "Munitie"-sectie als voor elk ander profiel.
+const AC_AMMO_PRESETS = [
+  { label:'5.56 M193 55gr', dragModel:'G1', bc:0.243, v0Ms:940 },
+  { label:'5.56 M855 62gr', dragModel:'G7', bc:0.151, v0Ms:900 },
+  { label:'5.56 Mk262 77gr', dragModel:'G7', bc:0.190, v0Ms:820 },
+  { label:'7.62 M80 147gr', dragModel:'G7', bc:0.200, v0Ms:830 },
+  { label:'7.62 M118LR 175gr', dragModel:'G7', bc:0.243, v0Ms:790 },
+  { label:'6.5 CM 140gr ELD-M', dragModel:'G7', bc:0.326, v0Ms:820 },
+];
+
 function acRenderProfileEditor(root){
   const p = acProfilesUI.draft;
   root.innerHTML = `
@@ -267,6 +292,13 @@ function acRenderProfileEditor(root){
 
         <fieldset>
           <legend>Munitie</legend>
+          <label for="pfAmmoPreset">Snelle preset</label>
+          <select id="pfAmmoPreset">
+            <option value="">— kies een fabrieksladingprofiel —</option>
+            ${AC_AMMO_PRESETS.map((preset,i)=>`<option value="${i}">${acEscapeHtml(preset.label)}</option>`).join('')}
+          </select>
+          <p class="hint">Indicatieve waarden, verifieer met eigen chrono/data — vult hieronder drag model, BC en V0 in.</p>
+
           <label for="pfBulletWeight">Bullet weight (gr)</label>
           <input type="number" id="pfBulletWeight" step="0.1" min="0" value="${acEscapeHtml(p.bulletWeightGr)}">
 
@@ -377,6 +409,16 @@ function acRenderProfileEditor(root){
 
   form.addEventListener('input', (e)=>{
     if(e.target.classList.contains('dope-windcall')) return; // has its own listener; avoid rebuilding the table mid-keystroke
+    syncDraftFromForm();
+    renderDopeTable();
+  });
+  root.querySelector('#pfAmmoPreset').addEventListener('change', (e)=>{
+    const preset = AC_AMMO_PRESETS[e.target.value];
+    if(!preset) return;
+    form.querySelector('#pfDragModel').value = preset.dragModel;
+    form.querySelector('#pfBc').value = preset.bc;
+    form.querySelector('#pfMv').value = preset.v0Ms;
+    form.querySelector('#pfMvUnit').value = 'ms';
     syncDraftFromForm();
     renderDopeTable();
   });
@@ -505,4 +547,5 @@ window.AppliedConceptsProfiles = {
   bcSanityError: acBcSanityError,
   fmtMil: acFmtMil,
   escapeHtml: acEscapeHtml,
+  toBallisticsInput: acProfileToBallisticsInput,
 };

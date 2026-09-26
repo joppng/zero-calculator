@@ -11,7 +11,7 @@ module.exports = {
   // Real page tabs, in the order they appear in the tabbar — kept here
   // instead of scraped, since the check needs this list even before the
   // page has loaded to know what to iterate over.
-  TABS: ['optic', 'profiles', 'turret', 'dryfire', 'train', 'shop', 'contact'],
+  TABS: ['optic', 'profiles', 'turret', 'dryfire', 'train', 'shottimer', 'dopecard', 'shop', 'contact'],
   VIEWPORTS: [
     { name: 'mobile', width: 375, height: 812 },
     { name: 'tablet', width: 768, height: 1024 },

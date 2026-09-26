@@ -442,12 +442,13 @@ function requestPrint(source){
 }
 window.AppliedConceptsPrint = requestPrint;
 
-const MB_TRAIN_GROUP_TABS = ['dryfire','train','shottimer'];
+const MB_TRAIN_GROUP_TABS = ['dryfire','train','shottimer','dopecard'];
 const MB_OPTIC_GROUP_TABS = ['optic','turret'];
 
 function switchTab(tab){
   if(tab !== 'dryfire' && window.AppliedConceptsDryfire) window.AppliedConceptsDryfire.stopTimer();
   if(tab !== 'shottimer' && window.AppliedConceptsShottimer) window.AppliedConceptsShottimer.stopTimer();
+  if(tab !== 'dopecard' && window.AppliedConceptsDopeCard) window.AppliedConceptsDopeCard.stopTimer();
   document.querySelectorAll('.tabbtn[data-tab]').forEach(b=>b.classList.toggle('active', b.dataset.tab===tab));
   document.querySelectorAll('.mb-item[data-tab]').forEach(b=>b.classList.toggle('active', b.dataset.tab===tab));
   el('mbTrainBtn').classList.toggle('active', MB_TRAIN_GROUP_TABS.includes(tab));
@@ -458,6 +459,7 @@ function switchTab(tab){
   el('panel-dryfire').classList.toggle('active', tab==='dryfire');
   el('panel-train').classList.toggle('active', tab==='train');
   el('panel-shottimer').classList.toggle('active', tab==='shottimer');
+  el('panel-dopecard').classList.toggle('active', tab==='dopecard');
   el('panel-shop').classList.toggle('active', tab==='shop');
   el('panel-contact').classList.toggle('active', tab==='contact');
   if(tab==='optic') renderOptic();
@@ -466,6 +468,7 @@ function switchTab(tab){
   else if(tab==='dryfire') window.AppliedConceptsDryfire.render();
   else if(tab==='train') window.AppliedConceptsTrain.init();
   else if(tab==='shottimer') window.AppliedConceptsShottimer.init();
+  else if(tab==='dopecard') window.AppliedConceptsDopeCard.init();
   else if(tab==='shop'){ window.AppliedConceptsShop.init(); window.AppliedConceptsShop.resetView(); }
   else if(tab==='contact') window.AppliedConceptsContact.init();
 }
@@ -790,6 +793,9 @@ function initInstallBanner(){
 --------------------------------------------------------------------- */
 try {
   const CHANGELOG = [
+    { version:'v1.72', date:'26-09-2026', items:[
+      'Dope Card: digitale pols-dope kaart met windklok, windholds en target card (max 3 doelen). Nieuwe tab na Contact — bij openen wordt het hele scherm de dope card (fullscreen, liggend, met een "pols-modus" om staand gedragen toestellen 90° te draaien voor de leesbaarheid). Gebruikt hetzelfde wapenprofiel als Wapenprofielen (kaliber/BC/V0/zero), met een eigen richtmiddelhoogte- en omgevingsinstelling (temperatuur/hoogte/luchtdruk). Windholds worden live doorgerekend zodra je de windsnelheid of -richting aanpast (swipe op het windvak, of sleep de wijzer op de windklok) — geen nieuwe berekening nodig. Werkt volledig offline, scherm blijft aan tijdens gebruik.',
+    ]},
     { version:'v1.71', date:'25-09-2026', items:[
       'App-brede opfrisbeurt van formulierelementen: checkboxes, keuzerondjes, schuifregelaars en dropdowns hebben nu een eigen, moderne opmaak in de huisstijl in plaats van de kale standaard-besturingselementen van de browser. Radiogroepen zoals Timer/Par, Handmatig/Willekeurig en de interval-keuze in Dry Fire zijn nu duidelijke pil-knoppen; schuifregelaars (o.a. Shottimer-gevoeligheid) tonen een gouden voortgangsvulling; dropdowns hebben een eigen pijltje. Puur visueel — geen functionaliteit gewijzigd.',
     ]},
@@ -1101,7 +1107,7 @@ try {
   // Runs after initOptic() so it overrides that default tab when a valid one
   // is requested; the pass phrase gate still shows on top regardless.
   const requestedTab = new URLSearchParams(location.search).get('tab');
-  if(['optic','profiles','turret','dryfire','train','shottimer','shop','contact'].includes(requestedTab)){
+  if(['optic','profiles','turret','dryfire','train','shottimer','shop','contact','dopecard'].includes(requestedTab)){
     switchTab(requestedTab);
   }
 } catch(err){

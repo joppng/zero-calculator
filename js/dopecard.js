@@ -398,14 +398,16 @@ function dcDopeScreenHtml(){
   const colsHtml = cols.map((colBlocks, ci) => {
     const windCellHtml = ci === 0 ? `
       <div class="dc-wind-cell" data-role="windcell" style="flex:${DC_WIND_CELL_WEIGHT} 1 0;">
+        <div class="dc-wind-info">
+          <span class="dc-wind-badge">${dir || '—'}</span>
+          <span class="dc-wind-value">${dcEffWind().eff.toFixed(1)}</span>
+          <span class="dc-wind-label">EFF WIND m/s</span>
+          <span class="dc-wind-sub">${dcWind.speedMps.toFixed(1)} @ ${dcClockLabel()}</span>
+        </div>
         <div class="dc-wind-mode-toggle" data-role="windmodetoggle">
           <button type="button" class="dc-wind-mode-btn${dcSettings.windCellMode!=='spindrift'?' active':''}" data-mode="wind">WIND</button>
           <button type="button" class="dc-wind-mode-btn${dcSettings.windCellMode==='spindrift'?' active':''}" data-mode="spindrift">SPIN</button>
         </div>
-        <span class="dc-wind-badge">${dir || '—'}</span>
-        <span class="dc-wind-value">${dcEffWind().eff.toFixed(1)}</span>
-        <span class="dc-wind-label">EFF WIND m/s</span>
-        <span class="dc-wind-sub">${dcWind.speedMps.toFixed(1)} @ ${dcClockLabel()}</span>
       </div>` : '';
     const blocksHtml = colBlocks.map(block => {
       const rowsHtml = block.distances.map((d,i) => {

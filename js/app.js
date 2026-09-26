@@ -793,6 +793,9 @@ function initInstallBanner(){
 --------------------------------------------------------------------- */
 try {
   const CHANGELOG = [
+    { version:'v1.75', date:'26-09-2026', items:[
+      'Dope Card: de WIND/SPIN-schakelaar in het windvak staat nu rechts in het vak (naast de wind-informatie, i.p.v. erboven) met grotere tikvlakken — was op een echt toestel lastig te raken.',
+    ]},
     { version:'v1.74', date:'26-09-2026', items:[
       'Dope Card: de kolommen (afstand/elevatie/wind) staan nu netjes onder elkaar uitgelijnd (vaste kolombreedtes i.p.v. meeschuivend met badge/gewone tekst). Het windvak heeft nu een WIND/SPIN-schakelaar: op SPIN tonen alle regels spindrift per afstand in plaats van windhold, berekend via de Miller-stabiliteitsformule en Litz\' spindrift-benadering (rechtsdraaiende twist aangenomen, zoals vrijwel elk modern geweer) — vereist twist rate, kogeldiameter, -lengte en -gewicht bij het wapenprofiel. De windstap bij het swipen op het windvak is nu instelbaar (0.5 / 1.0 / 2.0 m/s per stap) in plaats van vast op 0.5. Wapenprofielen heeft er een kogeldiameter-veld bij (automatisch ingevuld op basis van het kaliber).',
     ]},
